@@ -25,6 +25,7 @@ import os
 import sys
 from enum import Enum
 import logging
+import textwrap
 
 #Threading Dependencies
 from threading import Thread, Event
@@ -695,8 +696,10 @@ async def ProcessItemQueue():
                 itemclass = str(itemmessage['data'][2]['flags'])
                 location = str(LookupLocation(game,itemmessage['data'][4]['text']))
 
-                iitem = SpecialFormat(item,ItemClassColor(int(itemclass)),0)
-                message = "" + name + " found their " + iitem + "\nCheck: " + location
+                iname = SpecialFormat(name,6,1)
+                iitem = SpecialFormat(item,ItemClassColor(int(itemclass)),1)
+                ilocation = SpecialFormat("(" + textwrap.shorten(location, width=32, placeholder="…") + ")",3,1)
+                message = "" + iname + " found their " + iitem + " " + ilocation
 
 
                 ItemCheckLogMessage = name + "||" + item + "||" + name + "||" + location + "\n"
@@ -714,8 +717,11 @@ async def ProcessItemQueue():
                 recipient = str(LookupSlot(itemmessage['data'][4]['text']))
                 location = str(LookupLocation(game,itemmessage['data'][6]['text']))
 
-                iitem = SpecialFormat(item,ItemClassColor(int(itemclass)),0)
-                message = "" + name + " sent " + iitem + " to " + recipient + "\nCheck: " + location
+                iname = SpecialFormat(name,6,1)
+                iitem = SpecialFormat(item,ItemClassColor(int(itemclass)),1)
+                irecipient = SpecialFormat(recipient,7,1)
+                ilocation = SpecialFormat("(" + textwrap.shorten(location, width=32, placeholder="…") + ")",3,1)
+                message = "" + iname + " sent " + iitem + " to " + irecipient + " " + ilocation
             
 
                 ItemCheckLogMessage = recipient + "||" + item + "||" + name + "||" + location + "||" + itemclass + "\n"
