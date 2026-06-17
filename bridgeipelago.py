@@ -711,7 +711,7 @@ async def ProcessItemQueue():
 
                 iname = SpecialFormat(name,6,1)
                 iitem = SpecialFormat(item,ItemClassColor(int(itemclass)),1)
-                ilocation = SpecialFormat("(" + textwrap.shorten(location, width=50, placeholder="…") + ")",3,1)
+                ilocation = SpecialFormat("(" + textwrap.shorten(location, width=64, placeholder="…") + ")",3,1)
                 message = "" + iname + " found their " + iitem + " " + ilocation
 
 
@@ -733,7 +733,7 @@ async def ProcessItemQueue():
                 iname = SpecialFormat(name,6,1)
                 iitem = SpecialFormat(item,ItemClassColor(int(itemclass)),1)
                 irecipient = SpecialFormat(recipient,7,1)
-                ilocation = SpecialFormat("(" + textwrap.shorten(location, width=50, placeholder="…") + ")",3,1)
+                ilocation = SpecialFormat("(" + textwrap.shorten(location, width=64, placeholder="…") + ")",3,1)
                 message = "" + iname + " sent " + iitem + " to " + irecipient + " " + ilocation
             
 
@@ -755,12 +755,15 @@ async def ProcessItemQueue():
                     i.close()
             else:
                 message = "Unknown Item Send :("
-                # print(message)
-                string_buffer += message + "\n"
+                print(message)
+                # string_buffer += message + "\n"
                 await SendDebugChannelMessage(message)
 
             # message = "```ansi\n" + message + "```"
 
+            if (len(string_buffer) >= 1800):
+                await SendCheckQueue();
+                
             # If this item is for a player who's snoozed, we skip sending the message entirely
             if CheckSnoozeStatus(recipient):
                 return
