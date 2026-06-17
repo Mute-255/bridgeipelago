@@ -711,7 +711,7 @@ async def ProcessItemQueue():
 
                 iname = SpecialFormat(name,6,1)
                 iitem = SpecialFormat(item,ItemClassColor(int(itemclass)),1)
-                ilocation = SpecialFormat("(" + textwrap.shorten(location, width=32, placeholder="…") + ")",3,1)
+                ilocation = SpecialFormat("(" + textwrap.shorten(location, width=50, placeholder="…") + ")",3,1)
                 message = "" + iname + " found their " + iitem + " " + ilocation
 
 
@@ -733,7 +733,7 @@ async def ProcessItemQueue():
                 iname = SpecialFormat(name,6,1)
                 iitem = SpecialFormat(item,ItemClassColor(int(itemclass)),1)
                 irecipient = SpecialFormat(recipient,7,1)
-                ilocation = SpecialFormat("(" + textwrap.shorten(location, width=32, placeholder="…") + ")",3,1)
+                ilocation = SpecialFormat("(" + textwrap.shorten(location, width=50, placeholder="…") + ")",3,1)
                 message = "" + iname + " sent " + iitem + " to " + irecipient + " " + ilocation
             
 
