@@ -927,6 +927,9 @@ async def ProcessChatQueue():
                             await SendMainChannelMessage(MessageText)
                         elif CoreConfig["RelayConfig"]["APClientVideo"] == True and MessageMessage.startswith("!video"):
                             await SendMainChannelMessage(MessageText)
+                elif Message['data']['type'] == 'Goal':
+                    msg = Message['data']['data'][0]['text']
+                    await SendMainChannelMessage("```ansi\n[1;2m[1;36m[1;40m" + msg + "[0m[1;36m[0m[0m```")
                 else:
                     await SendMainChannelMessage(Message['data']['data'][0]['text'])  
             else:
