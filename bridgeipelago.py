@@ -1744,7 +1744,7 @@ def ItemClassColor(itmclass):
     elif(itmclass & ( 1 << 2 )):
         return 2
     else:
-        return 0
+        return 8
 
 def SpecialFormat(text,color,format):
 
