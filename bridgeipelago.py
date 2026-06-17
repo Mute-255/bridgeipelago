@@ -173,6 +173,8 @@ discordbridge_queue = Queue()
 hint_queue = Queue()
 hintprocessing_queue = Queue()
 
+string_buffer = ""
+
 #Discord Bot Initialization
 intents = discord.Intents.default()
 intents.message_content = True
@@ -537,6 +539,7 @@ async def on_ready():
     #Start background tasks
     CheckArchHost.start()
     ProcessItemQueue.start()
+    SendCheckQueue.start()
     ProcessDeathQueue.start()
     ProcessChatQueue.start()
     CheckCommandQueue.start()
@@ -644,6 +647,7 @@ async def CheckCommandQueue():
         print("++ Shutting down Discord tasks")
         CheckArchHost.stop()
         ProcessItemQueue.stop()
+        SendCheckQueue.stop()
         ProcessDeathQueue.stop()
         ProcessChatQueue.stop()
         
@@ -678,7 +682,16 @@ async def CheckArchHost():
             await DebugChannel.send("ERROR IN CHECKARCHHOST <@"+str(CoreConfig["DiscordConfig"]["DiscordAlertUserID"])+">")
 
 @tasks.loop(seconds=float(OverClockValue))
+async def SendCheckQueue():
+    global string_buffer
+
+    if string_buffer != "":
+        await SendMainChannelMessage("```ansi\n" + string_buffer.strip() + "```")
+        string_buffer = ""
+
+@tasks.loop(seconds=0.1)
 async def ProcessItemQueue():
+    global string_buffer
     try:
         if item_queue.empty():
             return
@@ -742,18 +755,22 @@ async def ProcessItemQueue():
                     i.close()
             else:
                 message = "Unknown Item Send :("
-                print(message)
+                # print(message)
+                string_buffer += message + "\n"
                 await SendDebugChannelMessage(message)
 
-            message = "```ansi\n" + message + "```"
+            # message = "```ansi\n" + message + "```"
 
             # If this item is for a player who's snoozed, we skip sending the message entirely
             if CheckSnoozeStatus(recipient):
-                await CancelProcess()
+                return
+                # await CancelProcess()
             elif int(itemclass) == 4 and CoreConfig["ItemFilterConfig"]["BotItemSpoilTraps"] == True:
-                await SendMainChannelMessage(message)
+                string_buffer += message + "\n"
+                # await SendMainChannelMessage(message)
             elif int(itemclass) != 4 and ItemFilter(int(itemclass),CoreConfig["ItemFilterConfig"]["BotItemFilterLevel"]):
-                await SendMainChannelMessage(message)
+                # await SendMainChannelMessage(message)
+                string_buffer += message + "\n"
             else:
                 #In Theory, this should only be called when the two above conditions are not met
                 #So we call this dummy function to escape the async call.
