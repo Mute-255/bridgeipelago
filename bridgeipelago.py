@@ -18,6 +18,7 @@
 
 
 #Core Dependencies
+import datetime
 import json
 import typing
 import uuid
@@ -628,6 +629,16 @@ async def on_message(message):
         relayed_message = "(Discord) " + str(message.author) + " - " + str(message.content)
         discordbridge_queue.put(relayed_message)
 
+    if message.content.startswith('$fakecheck'):
+        test_string = {"cmd": "PrintJSON", "data": [{"text": "3", "type": "player_id"}, {"text": " sent "}, {"text": "198501", "player": 2, "flags": 1, "type": "item_id"}, {"text": " to "}, {"text": "2", "type": "player_id"}, {"text": " ("}, {"text": "198838", "player": 3, "type": "location_id"}, {"text": ")"}], "type": "ItemSend", "receiving": 2, "item": {"item": 198501, "location": 198838, "player": 3, "flags": 1, "class": "NetworkItem"}}
+        test_string2 = {'cmd': 'PrintJSON', 'data': [{'text': '2', 'type': 'player_id'}, {'text': ' sent '}, {'text': '198523', 'player': 3, 'flags': 0, 'type': 'item_id'}, {'text': ' to '}, {'text': '3', 'type': 'player_id'}, {'text': ' ('}, {'text': '198895', 'player': 2, 'type': 'location_id'}, {'text': ')'}], 'type': 'ItemSend', 'receiving': 3, 'item': {'item': 198523, 'location': 198895, 'player': 2, 'flags': 0, 'class': 'NetworkItem'}}
+        test_string3 = {'cmd': 'PrintJSON', 'data': [{'text': '3', 'type': 'player_id'}, {'text': ' sent '}, {'text': '198523', 'player': 4, 'flags': 0, 'type': 'item_id'}, {'text': ' to '}, {'text': '4', 'type': 'player_id'}, {'text': ' ('}, {'text': '198911', 'player': 3, 'type': 'location_id'}, {'text': ')'}], 'type': 'ItemSend', 'receiving': 4, 'item': {'item': 198523, 'location': 198911, 'player': 3, 'flags': 0, 'class': 'NetworkItem'}}
+        for i in range(15):
+            item_queue.put(test_string2)
+            item_queue.put(test_string)
+            item_queue.put(test_string3)
+        # for i in range(15):
+
 @tasks.loop(seconds=1)
 async def CheckCommandQueue():
     global CoreConfig
@@ -686,16 +697,18 @@ async def SendCheckQueue():
     global string_buffer
 
     if string_buffer != "":
-        await SendMainChannelMessage("```ansi\n" + string_buffer.strip() + "```")
+        cur_buffer = string_buffer
         string_buffer = ""
+        await SendMainChannelMessage("```ansi\n" + cur_buffer.strip() + "```")
 
-@tasks.loop(seconds=0.1)
+@tasks.loop(seconds=0)
 async def ProcessItemQueue():
     global string_buffer
     try:
         if item_queue.empty():
             return
         else:
+            # print(str(datetime.datetime.now()) + " item queue count: " + str(item_queue.qsize()))
             timecode = time.strftime("%Y||%m||%d||%H||%M||%S")
             itemmessage = item_queue.get()
 
@@ -759,8 +772,6 @@ async def ProcessItemQueue():
                 # string_buffer += message + "\n"
                 await SendDebugChannelMessage(message)
 
-            # message = "```ansi\n" + message + "```"
-
             if (len(string_buffer) >= 1800):
                 await SendCheckQueue();
                 
@@ -774,10 +785,10 @@ async def ProcessItemQueue():
             elif int(itemclass) != 4 and ItemFilter(int(itemclass),CoreConfig["ItemFilterConfig"]["BotItemFilterLevel"]):
                 # await SendMainChannelMessage(message)
                 string_buffer += message + "\n"
-            else:
+            # else:
                 #In Theory, this should only be called when the two above conditions are not met
                 #So we call this dummy function to escape the async call.
-                await CancelProcess()
+                # await CancelProcess()
 
     except Exception as e:
         WriteToErrorLog("ItemQueue", "Error occurred while processing item queue: " + str(e))
