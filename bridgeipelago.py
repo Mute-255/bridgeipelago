@@ -1404,6 +1404,10 @@ async def Command_CheckCount():
         tables = soup.find("table",id="checks-table")
         for slots in tables.find_all('tbody'):
             rows = slots.find_all('tr')
+        
+        tfoot = tables.find('tfoot')
+        if (tfoot):
+            rows = rows + tfoot.find_all('tr')
 
         SlotWidth = 0
         GameWidth = 0
@@ -1414,12 +1418,14 @@ async def Command_CheckCount():
         StatusArray = [0]
         ChecksArray = [0]
 
+        last_row = rows[-1]
+
         #Moves through rows for data
         for row in rows:
             slot = (row.find_all('td')[1].text).strip()
             game = (row.find_all('td')[2].text).strip()
             status = (row.find_all('td')[3].text).strip()
-            checks = (row.find_all('td')[4].text).strip()
+            checks = (row.find_all('td')[3 if row == last_row else 4].text).strip()
             
             SlotArray.append(len(slot))
             GameArray.append(len(game))
@@ -1443,19 +1449,24 @@ async def Command_CheckCount():
         percent = "%"
 
         #Preps check message
-        checkmessage = "```" + slot.ljust(SlotWidth) + " || " + game.ljust(GameWidth) + " || " + checks.ljust(ChecksWidth) + " || " + percent +"\n"
-
+        checkmessage = "```fix\n" + slot.ljust(SlotWidth) + "｜" + game.ljust(GameWidth) + "｜" + checks.ljust(ChecksWidth) + "｜" + percent +"\n" + "```"
+        # separate the header row
+        await MainChannel.send(checkmessage)
+        checkmessage = "```"
+        
         for row in rows:
-            if len(checkmessage) > 1500:
-                checkmessage = checkmessage + "```"
-                await MainChannel.send(checkmessage)
-                checkmessage = "```"
             slot = (row.find_all('td')[1].text).strip()
             game = (row.find_all('td')[2].text).strip()
             status = (row.find_all('td')[3].text).strip()
-            checks = (row.find_all('td')[4].text).strip()
-            percent = (row.find_all('td')[5].text).strip()
-            checkmessage = checkmessage + slot.ljust(SlotWidth) + " || " + game.ljust(GameWidth) + " || " + checks.ljust(ChecksWidth) + " || " + percent + "\n"
+            checks = (row.find_all('td')[3 if row == last_row else 4].text).strip()
+            percent = (row.find_all('td')[4 if row == last_row else 5].text).strip()
+            percent_string = ("Goal" if status.startswith('Goal') else str(percent))
+            nextmessage = slot.ljust(SlotWidth) + "｜" + game.ljust(GameWidth) + "｜" + checks.ljust(ChecksWidth) + "｜" + percent_string + "\n"
+            if len(checkmessage) + len(nextmessage) >= 2000 or row == last_row:
+                checkmessage = checkmessage + "```"
+                await MainChannel.send(checkmessage)
+                checkmessage = "```fix\n" if row == last_row else "```"
+            checkmessage += nextmessage
 
 
         #Finishes the check message
