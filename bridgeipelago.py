@@ -540,7 +540,7 @@ async def on_ready():
     #Start background tasks
     CheckArchHost.start()
     ProcessItemQueue.start()
-    SendCheckQueue.start()
+    # SendCheckQueue.start()
     ProcessDeathQueue.start()
     ProcessChatQueue.start()
     CheckCommandQueue.start()
@@ -633,7 +633,7 @@ async def on_message(message):
         test_string = {"cmd": "PrintJSON", "data": [{"text": "3", "type": "player_id"}, {"text": " sent "}, {"text": "198501", "player": 2, "flags": 1, "type": "item_id"}, {"text": " to "}, {"text": "2", "type": "player_id"}, {"text": " ("}, {"text": "198838", "player": 3, "type": "location_id"}, {"text": ")"}], "type": "ItemSend", "receiving": 2, "item": {"item": 198501, "location": 198838, "player": 3, "flags": 1, "class": "NetworkItem"}}
         test_string2 = {'cmd': 'PrintJSON', 'data': [{'text': '2', 'type': 'player_id'}, {'text': ' sent '}, {'text': '198523', 'player': 3, 'flags': 0, 'type': 'item_id'}, {'text': ' to '}, {'text': '3', 'type': 'player_id'}, {'text': ' ('}, {'text': '198895', 'player': 2, 'type': 'location_id'}, {'text': ')'}], 'type': 'ItemSend', 'receiving': 3, 'item': {'item': 198523, 'location': 198895, 'player': 2, 'flags': 0, 'class': 'NetworkItem'}}
         test_string3 = {'cmd': 'PrintJSON', 'data': [{'text': '3', 'type': 'player_id'}, {'text': ' sent '}, {'text': '198523', 'player': 4, 'flags': 0, 'type': 'item_id'}, {'text': ' to '}, {'text': '4', 'type': 'player_id'}, {'text': ' ('}, {'text': '198911', 'player': 3, 'type': 'location_id'}, {'text': ')'}], 'type': 'ItemSend', 'receiving': 4, 'item': {'item': 198523, 'location': 198911, 'player': 3, 'flags': 0, 'class': 'NetworkItem'}}
-        for i in range(15):
+        for i in range(30):
             item_queue.put(test_string2)
             item_queue.put(test_string)
             item_queue.put(test_string3)
@@ -695,19 +695,26 @@ async def CheckArchHost():
 @tasks.loop(seconds=float(OverClockValue))
 async def SendCheckQueue():
     global string_buffer
-
+    # print("call: ", string_buffer)
     if string_buffer != "":
         cur_buffer = string_buffer
         string_buffer = ""
         await SendMainChannelMessage("```ansi\n" + cur_buffer.strip() + "```")
+    if string_buffer == "":
+        # print("stop")
+        SendCheckQueue.stop()
 
-@tasks.loop(seconds=0)
+@tasks.loop(seconds=0.1)
 async def ProcessItemQueue():
     global string_buffer
     try:
         if item_queue.empty():
             return
         else:
+            # print("start: ",len(string_buffer))
+            if (not SendCheckQueue.is_running()):
+                SendCheckQueue.start()
+            SendCheckQueue.restart()
             # print(str(datetime.datetime.now()) + " item queue count: " + str(item_queue.qsize()))
             timecode = time.strftime("%Y||%m||%d||%H||%M||%S")
             itemmessage = item_queue.get()
