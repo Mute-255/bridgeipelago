@@ -58,6 +58,11 @@ global ConfigLock
 global ToggleConfig
 global ToggleLock
 
+def shorten(text, width):
+    if len(text) <= width:
+        return text
+    return text[:width - 1] + "… "
+
 # Global Configuration Loader
 ## This allows us to share the config across multiple processes/threads without issue
 def GenerateConfigManagers():
@@ -192,8 +197,6 @@ except Exception as e:
     print("!!! Unable to load Overclock value from config, defaulting to 1 second.")
     print("!!! Error: " + str(e))
     OverClockValue = 1
-#TO DO - Central Control for bot I'll just leave this in for now.
-DiscordGuildID = 1171964435741544498
 
 #Optionaly Load in Meta Modules
 def LoadMetaModules():
@@ -225,7 +228,7 @@ class TrackerClient():
         self.port = CoreConfig["ArchipelagoConfig"]['ArchipelagoPort']
         self.password = GetArchPassword()
         self.slot_name = CoreConfig["ArchipelagoConfig"]['ArchipelagoBotSlot']
-        self.verbose_logging = CoreConfig["AdvancedConfig"]["DebugMode"]
+        self.verbose_logging = False # CoreConfig["AdvancedConfig"]["DebugMode"]
         self.ap_connection_kwargs = kwargs
         self.uuid: int = uuid.getnode()
         self.ap_connection: ClientConnection = None
@@ -247,8 +250,8 @@ class TrackerClient():
                         cmd = args.get('cmd')
                         MessageObject = {"type": "APMessage", "data": args, "flag": "None"}
                         
-                        if CoreConfig["AdvancedConfig"]["DebugMode"] == True:
-                            print(RawMessage)
+                        # if CoreConfig["AdvancedConfig"]["DebugMode"] == True:
+                        #     print(RawMessage)
                             
                         if cmd == self.MessageCommand.ROOM_INFO.value:
                             WriteRoomInfo(args)
@@ -403,7 +406,7 @@ class HintClient:
         self.port = CoreConfig["ArchipelagoConfig"]['ArchipelagoPort']
         self.password = GetArchPassword()
         self.slot_name = slot_name
-        self.verbose_logging = CoreConfig["AdvancedConfig"]["DebugMode"]
+        self.verbose_logging = False # CoreConfig["AdvancedConfig"]["DebugMode"]
         self.ap_connection_kwargs = kwargs
         self.uuid: int = uuid.getnode()
         self.ap_connection: ClientConnection = None
@@ -533,10 +536,15 @@ async def on_ready():
     #await MainChannel.send('Bot connected. Battle control - Online.')
     global DebugChannel
     DebugChannel = discord_client.get_channel(int(CoreConfig["DiscordConfig"]["DiscordDebugChannel"]))
-    await DebugChannel.send('Bot connected. Debug control - Online.')
 
-    # We wont sync the command tree for now, need to roll out central control first.
-    #await tree.sync(guild=discord.Object(id=DiscordGuildID))
+    sync_count = await tree.sync()
+    print(f"Synced {len(sync_count)} commands")
+
+    if CoreConfig["AdvancedConfig"]["DebugMode"]:
+        MainChannel = DebugChannel
+        await DebugChannel.send('Bot connected. - DEBUG MODE -')
+    else:
+        await DebugChannel.send('Bot connected. Debug control - Online.')
 
     #Start background tasks
     CheckArchHost.start()
@@ -558,11 +566,11 @@ async def on_message(message):
         return
     
     # Registers user for a alot in Archipelago
-    if message.content.startswith('$register'):
-        ArchSlot = message.content
-        ArchSlot = ArchSlot.replace("$register ","")
-        Status = await Command_Register(str(message.author),ArchSlot)
-        await SendMainChannelMessage(Status)
+    # if message.content.startswith('$register'):
+    #     ArchSlot = message.content
+    #     ArchSlot = ArchSlot.replace("$register ","")
+    #     Status = await Command_Register(str(message.author),ArchSlot)
+    #     await SendMainChannelMessage(Status)
 
     # Clears registration file for user
     if message.content.startswith('$clearreg'):
@@ -598,11 +606,11 @@ async def on_message(message):
     if message.content.startswith('$deathcount'):
         await Command_DeathCount()
     
-    if message.content.startswith('$checkcount'):
-        await Command_CheckCount()
+    # if message.content.startswith('$checkcount'):
+    #     await Command_CheckCount()
     
-    if message.content.startswith('$checkgraph'):
-        await Command_CheckGraph()
+    # if message.content.startswith('$checkgraph'):
+    #     await Command_CheckGraph()
     
     if message.content.startswith('$iloveyou'):
         await Command_ILoveYou(message)
@@ -971,24 +979,22 @@ async def ProcessChatQueue():
         await SendDebugChannelMessage("Error In Chat Queue Process")
 
 @tree.command(name="register",
-    description="Registers you for AP slot",
-    guild=discord.Object(id=DiscordGuildID)
+    description="Registers you for AP slot"
 )
-async def first_command(interaction,slot:str):
-    Status = await Command_Register(str(interaction.user),slot)    
+@app_commands.describe(slot="Enter name of your slot")
+async def first_command(interaction: discord.Interaction, slot: str):
+    Status = await Command_Register(str(interaction.user), slot)
     await interaction.response.send_message(content=Status,ephemeral=True)
 
 @tree.command(name="clearreg",
-    description="Clears your registration file",
-    guild=discord.Object(id=DiscordGuildID)
+    description="Clears your registration file"
 )
 async def first_command(interaction):
     Status = await Command_ClearReg(str(interaction.user))
     await interaction.response.send_message(content=Status,ephemeral=True)
     
 @tree.command(name="ketchmeup",
-    description="Ketches the user up with missed items",
-    guild=discord.Object(id=DiscordGuildID)
+    description="Ketches the user up with missed items"
 )
 async def first_command(interaction,filter:str):
     await interaction.user.create_dm()
@@ -997,36 +1003,31 @@ async def first_command(interaction,filter:str):
     await interaction.response.send_message(content="Sending your missed items... Please Hold.",ephemeral=True)
 
 @tree.command(name="groupcheck",
-    description="Ketches the user up with group game missed items",
-    guild=discord.Object(id=DiscordGuildID)
+    description="Ketches the user up with group game missed items"
 )
 async def first_command(interaction, groupslot:str):
     await Command_GroupCheck(interaction.user, groupslot)
     await interaction.response.send_message(content="Sending group missed items... Please Hold.",ephemeral=True)
 
 @tree.command(name="deathcount",
-    description="Posts a deathcount chart and graph",
-    guild=discord.Object(id=DiscordGuildID)
+    description="Posts a deathcount chart and graph"
 )
 async def first_command(interaction):
     await Command_DeathCount()
     await interaction.response.send_message(content="Deathcount")
 
 @tree.command(name="checkcount",
-    description="Posts a check chart",
-    guild=discord.Object(id=DiscordGuildID)
+    description="Posts a check chart"
 )
 async def first_command(interaction):
-    await Command_CheckCount()
-    await interaction.response.send_message(content="Checkcount:")
+    await Command_CheckCount(interaction)
 
 @tree.command(name="checkgraph",
-    description="Posts a check graph",
-    guild=discord.Object(id=DiscordGuildID)
+    description="Posts a check graph"
 )
 async def first_command(interaction):
-    await Command_CheckGraph()
-    await interaction.response.send_message(content="Checkgraph:")
+    await Command_CheckGraph(interaction)
+    # await interaction.response.send_message(content=msg)
 
 async def SendMainChannelMessage(message):
     await MainChannel.send(message)
@@ -1114,19 +1115,23 @@ async def Command_KetchMeUp(User, message_filter):
             message_filter = 0
 
         RegistrationFile = GetCoreDirectory("reg") + str(User) + ".json"
+        NoCheckList = ""
         if not os.path.isfile(RegistrationFile):
             await User.send("You've not registered for a slot : (")
         else:
             RegistrationContents = json.load(open(RegistrationFile, "r"))
             for reglines in RegistrationContents:
-                ItemQueueFile = GetCoreDirectory("item") + reglines.strip() + ".csv"
+                SlotName = reglines.strip()
+                ItemQueueFile = GetCoreDirectory("item") + SlotName + ".csv"
                 if not os.path.isfile(ItemQueueFile):
-                    await User.send("There are no items for " + reglines.strip() + " :/")
+                    NoCheckList += SlotName + ", "
+                    # await User.send("There are no items for " + SlotName + " :/")
                     continue
                 k = open(ItemQueueFile, "r")
                 ItemQueueLines = k.readlines()
                 k.close()
-                os.remove(ItemQueueFile)
+                if not CoreConfig["AdvancedConfig"]["DebugMode"]:
+                    os.remove(ItemQueueFile)
         
                 YouWidth = 0
                 ItemWidth = 0
@@ -1171,6 +1176,8 @@ async def Command_KetchMeUp(User, message_filter):
                 ketchupmessage = ketchupmessage + "```"
                 if not ketchupmessage == "``````":
                     await User.send(ketchupmessage)
+            if NoCheckList != "":
+                await User.send("There are no items for: " + NoCheckList[:-2] + " :/")
     except Exception as e:
         WriteToErrorLog("Command_KetchMeUp", "Error in ketch me up command: " + str(e))
         print(e)
@@ -1391,9 +1398,9 @@ async def Command_DeathCount():
         WriteToErrorLog("Command_DeathCount", "Error in death count command: " + str(e))
         await DebugChannel.send("ERROR DEATHCOUNT <@"+str(CoreConfig["DiscordConfig"]["DiscordAlertUserID"])+">")
 
-async def Command_CheckCount():
+async def Command_CheckCount(interaction: discord.Interaction):
     if CoreConfig["AdvancedConfig"]["SelfHostNoWeb"] == True:
-        await MainChannel.send("This command is not available in self-hosted mode.")
+        await interaction.response.send_message("This command is not available in self-hosted mode.", ephemeral=True)
         return
 
     try:
@@ -1419,11 +1426,12 @@ async def Command_CheckCount():
         ChecksArray = [0]
 
         last_row = rows[-1]
+        max_game_width = 35
 
         #Moves through rows for data
         for row in rows:
             slot = (row.find_all('td')[1].text).strip()
-            game = (row.find_all('td')[2].text).strip()
+            game = shorten((row.find_all('td')[2].text).strip(), max_game_width)
             status = (row.find_all('td')[3].text).strip()
             checks = (row.find_all('td')[3 if row == last_row else 4].text).strip()
             
@@ -1451,35 +1459,46 @@ async def Command_CheckCount():
         #Preps check message
         checkmessage = "```fix\n" + slot.ljust(SlotWidth) + "｜" + game.ljust(GameWidth) + "｜" + checks.ljust(ChecksWidth) + "｜" + percent +"\n" + "```"
         # separate the header row
-        await MainChannel.send(checkmessage)
-        checkmessage = "```"
+        # await interaction.response.send_message(checkmessage)
+        checkmessage += "```"
+        total_percent = 0
         
         for row in rows:
             slot = (row.find_all('td')[1].text).strip()
-            game = (row.find_all('td')[2].text).strip()
+            game = shorten((row.find_all('td')[2].text).strip(), max_game_width)
             status = (row.find_all('td')[3].text).strip()
             checks = (row.find_all('td')[3 if row == last_row else 4].text).strip()
             percent = (row.find_all('td')[4 if row == last_row else 5].text).strip()
+            if (row == last_row):
+                total_percent = float(percent) / 100
             percent_string = ("Goal" if status.startswith('Goal') else str(percent))
             nextmessage = slot.ljust(SlotWidth) + "｜" + game.ljust(GameWidth) + "｜" + checks.ljust(ChecksWidth) + "｜" + percent_string + "\n"
-            if len(checkmessage) + len(nextmessage) >= 2000 or row == last_row:
-                checkmessage = checkmessage + "```"
-                await MainChannel.send(checkmessage)
-                checkmessage = "```fix\n" if row == last_row else "```"
+            # if len(checkmessage) + len(nextmessage) >= 2000 or row == last_row:
+            #     checkmessage = checkmessage + "```"
+            #     await interaction.channel.send(checkmessage)
+            #     checkmessage = "```fix\n" if row == last_row else "```"
+            if row == last_row:
+                checkmessage += "```"
+                checkmessage += "```fix\n"
             checkmessage += nextmessage
 
 
         #Finishes the check message
         checkmessage = checkmessage + "```"
-        await MainChannel.send(checkmessage)
+        embed = discord.Embed(
+            description=checkmessage,
+            color=discord.Color.from_rgb(int(min(2*(1-total_percent), 1) * 200), int(min(total_percent*2, 1) * 200), 0)
+        )
+        await interaction.response.send_message(embed=embed)
+        # return checkmessage
     except Exception as e:
         WriteToErrorLog("Command_CheckCount", "Error in check count command: " + str(e))
         print(e)
         await DebugChannel.send("ERROR IN CHECKCOUNT <@"+str(CoreConfig["DiscordConfig"]["DiscordAlertUserID"])+">")
 
-async def Command_CheckGraph():
+async def Command_CheckGraph(interaction: discord.Interaction):
     if CoreConfig["AdvancedConfig"]["SelfHostNoWeb"] == True:
-        await MainChannel.send("This command is not available in self-hosted mode.")
+        await interaction.response.send_message("This command is not available in self-hosted mode.", ephemeral=True)
         return
 
     try:
@@ -1554,7 +1573,7 @@ async def Command_CheckGraph():
 
         # Save image and send - any existing plot will be overwritten
         plt.savefig(GetCoreFiles("checkplot"), bbox_inches="tight")
-        await MainChannel.send(file=discord.File(GetCoreFiles("checkplot")))
+        await interaction.response.send_message(file=discord.File(GetCoreFiles("checkplot")))
     except Exception as e:
         WriteToErrorLog("Command_CheckGraph", "Error in check graph command: " + str(e))
         print(e)
