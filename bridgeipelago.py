@@ -1813,7 +1813,7 @@ def ItemClassSymbol(itmclass):
     if(itmclass & ( 1 << 0 )):
         return "★"
     elif(itmclass & ( 1 << 1 )):
-        return "⬦"
+        return "▲"
     elif(itmclass & ( 1 << 2 )):
         return "⨯"
     else:
