@@ -21,6 +21,7 @@
 import datetime
 import asyncio
 import json
+import random
 import typing
 import uuid
 import os
@@ -269,6 +270,8 @@ class TrackerClient():
                             seppuku_queue.put(args)
                         elif cmd == self.MessageCommand.PRINT_JSON.value:
                             if args.get('type') == 'ItemSend':
+                                if CoreConfig["AdvancedConfig"]["DebugMode"] == True:
+                                    print(args)
                                 item_queue.put(args)
                             elif args.get('type') == 'Chat':
                                 if CoreConfig["RelayConfig"]["ChatMessages"] == True:
@@ -639,14 +642,11 @@ async def on_message(message):
         discordbridge_queue.put(relayed_message)
 
     if message.content.startswith('$fakecheck'):
-        test_string = {"cmd": "PrintJSON", "data": [{"text": "3", "type": "player_id"}, {"text": " sent "}, {"text": "198501", "player": 2, "flags": 1, "type": "item_id"}, {"text": " to "}, {"text": "2", "type": "player_id"}, {"text": " ("}, {"text": "198838", "player": 3, "type": "location_id"}, {"text": ")"}], "type": "ItemSend", "receiving": 2, "item": {"item": 198501, "location": 198838, "player": 3, "flags": 1, "class": "NetworkItem"}}
-        test_string2 = {'cmd': 'PrintJSON', 'data': [{'text': '2', 'type': 'player_id'}, {'text': ' sent '}, {'text': '198523', 'player': 3, 'flags': 0, 'type': 'item_id'}, {'text': ' to '}, {'text': '3', 'type': 'player_id'}, {'text': ' ('}, {'text': '198895', 'player': 2, 'type': 'location_id'}, {'text': ')'}], 'type': 'ItemSend', 'receiving': 3, 'item': {'item': 198523, 'location': 198895, 'player': 2, 'flags': 0, 'class': 'NetworkItem'}}
-        test_string3 = {'cmd': 'PrintJSON', 'data': [{'text': '3', 'type': 'player_id'}, {'text': ' sent '}, {'text': '198523', 'player': 4, 'flags': 0, 'type': 'item_id'}, {'text': ' to '}, {'text': '4', 'type': 'player_id'}, {'text': ' ('}, {'text': '198911', 'player': 3, 'type': 'location_id'}, {'text': ')'}], 'type': 'ItemSend', 'receiving': 4, 'item': {'item': 198523, 'location': 198911, 'player': 3, 'flags': 0, 'class': 'NetworkItem'}}
+        lines = open('sampledata.txt').read().splitlines()
         check_count = message.content.replace("$fakecheck ","")
         for i in range(int(check_count)):
-            item_queue.put(test_string2)
-            item_queue.put(test_string)
-            item_queue.put(test_string3)
+            line = random.choice(lines)
+            item_queue.put(json.loads(line))
 
 @tasks.loop(seconds=1)
 async def CheckCommandQueue():
@@ -708,7 +708,12 @@ async def SendCheckQueue():
     if string_buffer != "":
         cur_buffer = string_buffer
         string_buffer = ""
-        await SendMainChannelMessage("```ansi\n" + cur_buffer.strip() + "```")
+        # await SendMainChannelMessage("```ansi\n" + cur_buffer.strip() + "```")
+        embed = discord.Embed(
+            description="```ansi\n" + cur_buffer.strip() + "```",
+            color=discord.Color.blue()
+        )
+        await DebugChannel.send(embed=embed)
     if string_buffer == "":
         # print("stop")
         SendCheckQueue.stop()
@@ -718,7 +723,7 @@ async def PreSendCheckQueue():
     # print(" precall: ", datetime.datetime.now(), item_queue.qsize())
     await asyncio.sleep(SendCheckQueue.seconds)
 
-@tasks.loop(seconds=0.1)
+@tasks.loop(seconds=0.05)
 async def ProcessItemQueue():
     global string_buffer
     try:
@@ -743,9 +748,9 @@ async def ProcessItemQueue():
                 location = str(LookupLocation(game,itemmessage['data'][4]['text']))
 
                 iname = SpecialFormat(name,6,1)
-                iitem = SpecialFormat(item,ItemClassColor(int(itemclass)),1)
+                iitem = SpecialFormat(ItemClassSymbol(int(itemclass)) + " " + item,ItemClassColor(int(itemclass)),1)
                 ilocation = SpecialFormat("(" + textwrap.shorten(location, width=64, placeholder="…") + ")",3,1)
-                message = "" + iname + " found their " + iitem + " " + ilocation
+                message = "" + iname + " found their " + iitem + "\n  ↳  " + ilocation
 
 
                 ItemCheckLogMessage = name + "||" + item + "||" + name + "||" + location + "\n"
@@ -764,10 +769,10 @@ async def ProcessItemQueue():
                 location = str(LookupLocation(game,itemmessage['data'][6]['text']))
 
                 iname = SpecialFormat(name,6,1)
-                iitem = SpecialFormat(item,ItemClassColor(int(itemclass)),1)
+                iitem = SpecialFormat(ItemClassSymbol(int(itemclass)) + " " + item,ItemClassColor(int(itemclass)),1)
                 irecipient = SpecialFormat(recipient,7,1)
                 ilocation = SpecialFormat("(" + textwrap.shorten(location, width=64, placeholder="…") + ")",3,1)
-                message = "" + iname + " sent " + iitem + " to " + irecipient + " " + ilocation
+                message = "" + iname + " sent " + iitem + " to " + irecipient + "\n  ↳  " + ilocation
             
 
                 ItemCheckLogMessage = recipient + "||" + item + "||" + name + "||" + location + "||" + itemclass + "\n"
@@ -1803,6 +1808,16 @@ def ItemClassColor(itmclass):
         return 2
     else:
         return 8
+    
+def ItemClassSymbol(itmclass):
+    if(itmclass & ( 1 << 0 )):
+        return "★"
+    elif(itmclass & ( 1 << 1 )):
+        return "⬦"
+    elif(itmclass & ( 1 << 2 )):
+        return "⨯"
+    else:
+        return "•"
 
 def SpecialFormat(text,color,format):
 
