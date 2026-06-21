@@ -23,6 +23,7 @@ import asyncio
 import json
 import random
 import re
+import traceback
 import typing
 import uuid
 import os
@@ -120,6 +121,8 @@ def GetCoreDirectory(folder):
         return str(os.getcwd() + CoreConfig["AdvancedConfig"]["PlayerItemQueueDirectory"] + CoreConfig["ArchipelagoConfig"]['UniqueID'] + '/')
     elif folder == "arch":
         return str(os.getcwd() + CoreConfig["AdvancedConfig"]["ArchipelagoDataDirectory"] + CoreConfig["ArchipelagoConfig"]['UniqueID'] + '/')
+    elif folder == "global":
+        return str(os.getcwd() + "/globals/")
     
 def GetCoreFiles(file):
     global CoreConfig
@@ -146,6 +149,8 @@ def GetCoreFiles(file):
         return GetCoreDirectory("arch") + 'ArchRoomData.json'
     elif file == "archstatus":
         return GetCoreDirectory("arch") + 'ArchStatus.json'
+    elif file == "coldata":
+        return GetCoreDirectory("global") + 'ColData.json'
 
 def SetupLogger():
     global CoreConfig
@@ -543,8 +548,8 @@ async def on_ready():
     global DebugChannel
     DebugChannel = discord_client.get_channel(int(CoreConfig["DiscordConfig"]["DiscordDebugChannel"]))
 
-    sync_count = await tree.sync()
-    print(f"Synced {len(sync_count)} commands")
+    # sync_count = await tree.sync()
+    # print(f"Synced {len(sync_count)} commands")
 
     if CoreConfig["AdvancedConfig"]["DebugMode"]:
         MainChannel = DebugChannel
@@ -723,8 +728,6 @@ async def SendCheckQueue():
         first_sender = remove_ansi_escape_sequences(cur_buffer.split()[0])
         sender_prefix = re.split(r'(?=[A-Z])', first_sender.strip())[1] # Gets the first sentence case segment, e.g. TestUser returns Test
         col_str = (user_colour_dict.get(sender_prefix, "#306b83"))
-        print(first_sender, sender_prefix, col_str)
-        print(user_colour_dict, sender_prefix == 'Bridgeipelago')
 
         # await SendMainChannelMessage("```ansi\n" + cur_buffer.strip() + "```")
         embed = discord.Embed(
@@ -1019,6 +1022,7 @@ async def first_command(interaction):
 @tree.command(name="ketchmeup",
     description="Ketches the user up with missed items"
 )
+@app_commands.describe(filter="1 = useful + progression, 2 = progression only")
 async def first_command(interaction: discord.Interaction, filter: str=None):
     await interaction.user.create_dm()
     UserDM = interaction.user
@@ -1052,14 +1056,40 @@ async def first_command(interaction):
     await Command_CheckGraph(interaction)
     # await interaction.response.send_message(content=msg)
 
+@tree.command(name="sync",
+    description="Sync bot commands"
+)
+async def sync_cmd(interaction, guild_id: str = None):
+    sync_count = await (tree.sync() if guild_id is None else tree.sync(guild=discord.Object(id=int(guild_id))))
+    await interaction.response.send_message(content=f"Synced {len(sync_count)} commands",ephemeral=True)
+
+@tree.command(name="setcol",
+    description="Assign a colour for embeds for a target user's checks or DMs"
+)
+@app_commands.describe(
+    name="Enter common prefix for slot (e.g. User for UserGameName, case sensitive)",
+    col="Enter hexadecimal colour code (e.g. #0066FF) or `clear` to remove"
+)
+async def setcol_cmd(interaction, name: str, col: str):
+    if col.lower() == 'clear':
+        if name in user_colour_dict:
+            user_colour_dict.pop(name)
+            WriteColData()
+            await interaction.response.send_message(content=f"Removed {name} colour data",ephemeral=True)
+        else:
+            await interaction.response.send_message(content=f"{name} had no saved colour data",ephemeral=True)
+    elif col[0].startswith("#"):
+        user_colour_dict.update({ name: col })
+        WriteColData()
+        await interaction.response.send_message(content=f"Set {name} to {col}",ephemeral=True)
+    else:
+        await interaction.response.send_message(content=f"Provide hex code or `clear`",ephemeral=True)
+
 async def SendMainChannelMessage(message):
     await MainChannel.send(message)
 
 async def SendDebugChannelMessage(message):
     await DebugChannel.send(message)
-
-async def SendDMMessage(message,user):
-    await MainChannel.send(message)
 
 async def Command_Register(Sender:str, ArchSlot:str):
     try:
@@ -1151,6 +1181,9 @@ async def Command_KetchMeUp(User, message_filter):
                 k.close()
                 if not CoreConfig["AdvancedConfig"]["DebugMode"]:
                     os.remove(ItemQueueFile)
+
+                target_prefix = re.split(r'(?=[A-Z])', SlotName.strip())[1] # Gets the first sentence case segment, e.g. TestUser returns Test
+                col_str = (user_colour_dict.get(target_prefix, "#306b83"))
         
                 # YouWidth = 0
                 ItemWidth = 0
@@ -1190,14 +1223,13 @@ async def Command_KetchMeUp(User, message_filter):
                     Class = line.split("||")[4].strip()
 
                     if ItemFilter(int(Class),int(message_filter)):
-                        # ketchupmessage = ketchupmessage + You.ljust(YouWidth) + " || " + Item.ljust(ItemWidth) + " || " + Sender.ljust(SenderWidth) + " || " + Location + "\n"
                         ketchupmessage = ketchupmessage + ItemClassSymbol(int(Class)) + (SpecialFormat(Item.ljust(ItemWidth),ItemClassColor(int(Class)),1)) + "｜" + Sender.ljust(SenderWidth) + "｜" + truncate(Location, 70 - ItemWidth - SenderWidth) + "\n"
 
                     if len(ketchupmessage) > 3800:
                         embed = discord.Embed(
                             title = title,
                             description="```ansi\n" + ketchupmessage.strip() + "```",
-                            color=discord.Color.blue()
+                            color = discord.Color.from_str(col_str)
                         )
                         await User.send(embed=embed)
                         ketchupmessage = ""
@@ -1206,14 +1238,14 @@ async def Command_KetchMeUp(User, message_filter):
                     embed = discord.Embed(
                         title = title,
                         description="```ansi\n" + ketchupmessage.strip() + "```",
-                        color=discord.Color.blue()
+                        color = discord.Color.from_str(col_str)
                     )
                     await User.send(embed=embed)
             if NoCheckList != "":
                 await User.send("There are no items for: " + NoCheckList[:-2] + " :/")
     except Exception as e:
         WriteToErrorLog("Command_KetchMeUp", "Error in ketch me up command: " + str(e))
-        print(e)
+        print(traceback.format_exc())
         await DebugChannel.send("ERROR IN KETCHMEUP <@"+str(CoreConfig["DiscordConfig"]["DiscordAlertUserID"])+">")
 
 async def Command_GroupCheck(DMauthor, game):
@@ -1685,6 +1717,12 @@ def ConfirmSpecialFiles():
     if not os.path.exists(GetCoreFiles("archstatus")):
         json.dump({}, open(GetCoreFiles("archstatus"), "w"))
 
+    if not os.path.exists(GetCoreDirectory("global")):
+        os.makedirs(GetCoreDirectory("global"))
+
+    if not os.path.exists(GetCoreFiles("coldata")):
+        json.dump({}, open(GetCoreFiles("coldata"), "x"))
+
 def WriteDataPackage(data):
     with open(GetCoreFiles("archgamedump"), 'w') as f:
         json.dump(data['data']['games'], f, indent=4)
@@ -1726,6 +1764,10 @@ def CheckDatapackage():
             return False
     else:
         return False
+
+def WriteColData():
+    with open(GetCoreFiles("coldata"), 'w') as f:
+        json.dump(user_colour_dict, f, indent=4)
     
 def CheckGameDump():
     if os.path.exists(GetCoreFiles("archgamedump")):
@@ -1958,6 +2000,7 @@ def main():
     global ReconnectionTimer
     global discord_client
     global tracker_client
+    global user_colour_dict
 
     # Version Checking against GitHub
     try:
@@ -1978,6 +2021,9 @@ def main():
     LoadMetaModules()
     # Confirm all of the core directories and files exist just to be safe
     ConfirmSpecialFiles()
+
+    user_colour_dict = json.loads(open(GetCoreFiles("coldata")).read())
+    print(f"User col data: {user_colour_dict}")
 
     ## Threadded async functions
     if(CoreConfig["AdvancedConfig"]["DiscordJoinOnly"] == False):
@@ -2016,7 +2062,7 @@ def main():
             time.sleep(2)
 
         print("== Arch Data Loaded!")
-        time.sleep(3)
+        time.sleep(2)
 
     DiscordThread = Process(target=Discord, args=(CoreConfig,ToggleConfig))
     DiscordThread.start()
