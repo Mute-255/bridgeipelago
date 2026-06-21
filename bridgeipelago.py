@@ -22,6 +22,7 @@ import datetime
 import asyncio
 import json
 import random
+import re
 import typing
 import uuid
 import os
@@ -182,6 +183,8 @@ hint_queue = Queue()
 hintprocessing_queue = Queue()
 
 string_buffer = ""
+
+user_colour_dict = {}
 
 #Discord Bot Initialization
 intents = discord.Intents.default()
@@ -614,6 +617,9 @@ async def on_message(message):
     
     # if message.content.startswith('$checkgraph'):
     #     await Command_CheckGraph()
+
+    if message.content.startswith('$testusercol'):
+        user_colour_dict.update({ 'Bridgeipelago': '#00FF00' })
     
     if message.content.startswith('$iloveyou'):
         await Command_ILoveYou(message)
@@ -701,17 +707,29 @@ async def CheckArchHost():
             WriteToErrorLog("CheckArchHost", "Error occurred while checking ArchHost: " + str(e))
             await DebugChannel.send("ERROR IN CHECKARCHHOST <@"+str(CoreConfig["DiscordConfig"]["DiscordAlertUserID"])+">")
 
+def remove_ansi_escape_sequences(text):
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    return ansi_escape.sub('', text)
+
 @tasks.loop(seconds=float(OverClockValue))
 async def SendCheckQueue():
     global string_buffer
+    global user_colour_dict
     # print("call: ", datetime.datetime.now(), item_queue.qsize())
     if string_buffer != "":
         cur_buffer = string_buffer
         string_buffer = ""
+
+        first_sender = remove_ansi_escape_sequences(cur_buffer.split()[0])
+        sender_prefix = re.split(r'(?=[A-Z])', first_sender.strip())[1] # Gets the first sentence case segment, e.g. TestUser returns Test
+        col_str = (user_colour_dict.get(sender_prefix, "#306b83"))
+        print(first_sender, sender_prefix, col_str)
+        print(user_colour_dict, sender_prefix == 'Bridgeipelago')
+
         # await SendMainChannelMessage("```ansi\n" + cur_buffer.strip() + "```")
         embed = discord.Embed(
-            description="```ansi\n" + cur_buffer.strip() + "```",
-            color=discord.Color.blue()
+            description = "```ansi\n" + cur_buffer.strip() + "```",
+            color = discord.Color.from_str(col_str)
         )
         await DebugChannel.send(embed=embed)
     if string_buffer == "":
