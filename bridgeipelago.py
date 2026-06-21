@@ -59,7 +59,7 @@ global ConfigLock
 global ToggleConfig
 global ToggleLock
 
-def shorten(text, width):
+def truncate(text, width):
     if len(text) <= width:
         return text
     return text[:width - 1] + "… "
@@ -748,7 +748,7 @@ async def ProcessItemQueue():
                 location = str(LookupLocation(game,itemmessage['data'][4]['text']))
 
                 iname = SpecialFormat(name,6,1)
-                iitem = SpecialFormat(ItemClassSymbol(int(itemclass)) + " " + item,ItemClassColor(int(itemclass)),1)
+                iitem = SpecialFormat(ItemClassSymbol(int(itemclass)) + item,ItemClassColor(int(itemclass)),1)
                 ilocation = SpecialFormat("(" + textwrap.shorten(location, width=64, placeholder="…") + ")",3,1)
                 message = "" + iname + " found their " + iitem + "\n  ↳  " + ilocation
 
@@ -769,7 +769,7 @@ async def ProcessItemQueue():
                 location = str(LookupLocation(game,itemmessage['data'][6]['text']))
 
                 iname = SpecialFormat(name,6,1)
-                iitem = SpecialFormat(ItemClassSymbol(int(itemclass)) + " " + item,ItemClassColor(int(itemclass)),1)
+                iitem = SpecialFormat(ItemClassSymbol(int(itemclass)) + item,ItemClassColor(int(itemclass)),1)
                 irecipient = SpecialFormat(recipient,7,1)
                 ilocation = SpecialFormat("(" + textwrap.shorten(location, width=64, placeholder="…") + ")",3,1)
                 message = "" + iname + " sent " + iitem + " to " + irecipient + "\n  ↳  " + ilocation
@@ -1001,10 +1001,10 @@ async def first_command(interaction):
 @tree.command(name="ketchmeup",
     description="Ketches the user up with missed items"
 )
-async def first_command(interaction,filter:str):
+async def first_command(interaction: discord.Interaction, filter: str=None):
     await interaction.user.create_dm()
     UserDM = interaction.user
-    await Command_KetchMeUp(UserDM, interaction.message.content)
+    await Command_KetchMeUp(UserDM, filter)
     await interaction.response.send_message(content="Sending your missed items... Please Hold.",ephemeral=True)
 
 @tree.command(name="groupcheck",
@@ -1108,16 +1108,12 @@ async def Command_ClearReg(Sender:str):
 
 async def Command_KetchMeUp(User, message_filter):
     try:
+        if message_filter == None or message_filter == "" or not str(message_filter).isalnum():
+            message_filter = "0"
+
         message_filter = message_filter.replace("$ketchmeup","")
         message_filter = message_filter.replace("/ketchmeup","")
         message_filter = message_filter.strip()
-
-        if message_filter == "" or message_filter == None:
-            message_filter = 0
-        try:
-            message_filter = int(message_filter)
-        except:
-            message_filter = 0
 
         RegistrationFile = GetCoreDirectory("reg") + str(User) + ".json"
         NoCheckList = ""
@@ -1138,7 +1134,7 @@ async def Command_KetchMeUp(User, message_filter):
                 if not CoreConfig["AdvancedConfig"]["DebugMode"]:
                     os.remove(ItemQueueFile)
         
-                YouWidth = 0
+                # YouWidth = 0
                 ItemWidth = 0
                 SenderWidth = 0
                 YouArray = [0]
@@ -1146,11 +1142,12 @@ async def Command_KetchMeUp(User, message_filter):
                 SenderArray = [0]
         
                 for line in ItemQueueLines:
-                    YouArray.append(len(line.split("||")[0]))
-                    ItemArray.append(len(line.split("||")[1]))
+                    # YouArray.append(len(line.split("||")[0]))
+                    Class = line.split("||")[4].strip()
+                    ItemArray.append(len(line.split("||")[1]) + len(ItemClassSymbol(int(Class))))
                     SenderArray.append(len(line.split("||")[2]))
                 
-                YouArray.sort(reverse=True)
+                # YouArray.sort(reverse=True)
                 ItemArray.sort(reverse=True)
                 SenderArray.sort(reverse=True)
         
@@ -1162,25 +1159,38 @@ async def Command_KetchMeUp(User, message_filter):
                 Item = "Item"
                 Sender = "Sender"
                 Location = "Location"
-        
-                ketchupmessage = "```" + You.ljust(YouWidth) + " || " + Item.ljust(ItemWidth) + " || " + Sender.ljust(SenderWidth) + " || " + Location + "\n"
+
+                ketchupmessage = ""
+                # ketchupmessage = "```" + You.ljust(YouWidth) + " || " + Item.ljust(ItemWidth) + " || " + Sender.ljust(SenderWidth) + " || " + Location + "\n"
+                title = f"Items for {SlotName}"
+
                 for line in ItemQueueLines:
-                    You = line.split("||")[0].strip()
+                    # You = line.split("||")[0].strip()
                     Item = line.split("||")[1].strip()
                     Sender = line.split("||")[2].strip()
                     Location = line.split("||")[3].strip()
                     Class = line.split("||")[4].strip()
 
                     if ItemFilter(int(Class),int(message_filter)):
-                        ketchupmessage = ketchupmessage + You.ljust(YouWidth) + " || " + Item.ljust(ItemWidth) + " || " + Sender.ljust(SenderWidth) + " || " + Location + "\n"
+                        # ketchupmessage = ketchupmessage + You.ljust(YouWidth) + " || " + Item.ljust(ItemWidth) + " || " + Sender.ljust(SenderWidth) + " || " + Location + "\n"
+                        ketchupmessage = ketchupmessage + ItemClassSymbol(int(Class)) + Item.ljust(ItemWidth) + "｜" + Sender.ljust(SenderWidth) + "｜" + truncate(Location, 70 - ItemWidth - SenderWidth) + "\n"
 
-                    if len(ketchupmessage) > 1500:
-                        ketchupmessage = ketchupmessage + "```"
-                        await User.send(ketchupmessage)
-                        ketchupmessage = "```"
-                ketchupmessage = ketchupmessage + "```"
-                if not ketchupmessage == "``````":
-                    await User.send(ketchupmessage)
+                    if len(ketchupmessage) > 3800:
+                        embed = discord.Embed(
+                            title = title,
+                            description="```ansi\n" + ketchupmessage.strip() + "```",
+                            color=discord.Color.blue()
+                        )
+                        await User.send(embed=embed)
+                        ketchupmessage = ""
+
+                if not ketchupmessage == "":
+                    embed = discord.Embed(
+                        title = title,
+                        description="```ansi\n" + ketchupmessage.strip() + "```",
+                        color=discord.Color.blue()
+                    )
+                    await User.send(embed=embed)
             if NoCheckList != "":
                 await User.send("There are no items for: " + NoCheckList[:-2] + " :/")
     except Exception as e:
@@ -1436,7 +1446,7 @@ async def Command_CheckCount(interaction: discord.Interaction):
         #Moves through rows for data
         for row in rows:
             slot = (row.find_all('td')[1].text).strip()
-            game = shorten((row.find_all('td')[2].text).strip(), max_game_width)
+            game = truncate((row.find_all('td')[2].text).strip(), max_game_width)
             status = (row.find_all('td')[3].text).strip()
             checks = (row.find_all('td')[3 if row == last_row else 4].text).strip()
             
@@ -1470,7 +1480,7 @@ async def Command_CheckCount(interaction: discord.Interaction):
         
         for row in rows:
             slot = (row.find_all('td')[1].text).strip()
-            game = shorten((row.find_all('td')[2].text).strip(), max_game_width)
+            game = truncate((row.find_all('td')[2].text).strip(), max_game_width)
             status = (row.find_all('td')[3].text).strip()
             checks = (row.find_all('td')[3 if row == last_row else 4].text).strip()
             percent = (row.find_all('td')[4 if row == last_row else 5].text).strip()
@@ -1811,13 +1821,13 @@ def ItemClassColor(itmclass):
     
 def ItemClassSymbol(itmclass):
     if(itmclass & ( 1 << 0 )):
-        return "★"
+        return "⋆  "
     elif(itmclass & ( 1 << 1 )):
-        return "▲"
+        return "▲ "
     elif(itmclass & ( 1 << 2 )):
-        return "⨯"
+        return "⨯ "
     else:
-        return "•"
+        return "• "
 
 def SpecialFormat(text,color,format):
 
