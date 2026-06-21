@@ -1004,8 +1004,8 @@ async def first_command(interaction):
 async def first_command(interaction: discord.Interaction, filter: str=None):
     await interaction.user.create_dm()
     UserDM = interaction.user
-    await Command_KetchMeUp(UserDM, filter)
     await interaction.response.send_message(content="Sending your missed items... Please Hold.",ephemeral=True)
+    await Command_KetchMeUp(UserDM, filter)
 
 @tree.command(name="groupcheck",
     description="Ketches the user up with group game missed items"
@@ -1173,7 +1173,7 @@ async def Command_KetchMeUp(User, message_filter):
 
                     if ItemFilter(int(Class),int(message_filter)):
                         # ketchupmessage = ketchupmessage + You.ljust(YouWidth) + " || " + Item.ljust(ItemWidth) + " || " + Sender.ljust(SenderWidth) + " || " + Location + "\n"
-                        ketchupmessage = ketchupmessage + ItemClassSymbol(int(Class)) + Item.ljust(ItemWidth) + "｜" + Sender.ljust(SenderWidth) + "｜" + truncate(Location, 70 - ItemWidth - SenderWidth) + "\n"
+                        ketchupmessage = ketchupmessage + ItemClassSymbol(int(Class)) + (SpecialFormat(Item.ljust(ItemWidth),ItemClassColor(int(Class)),1)) + "｜" + Sender.ljust(SenderWidth) + "｜" + truncate(Location, 70 - ItemWidth - SenderWidth) + "\n"
 
                     if len(ketchupmessage) > 3800:
                         embed = discord.Embed(
@@ -1821,11 +1821,11 @@ def ItemClassColor(itmclass):
     
 def ItemClassSymbol(itmclass):
     if(itmclass & ( 1 << 0 )):
-        return "⋆  "
+        return "★ "    # U+2005 	FOUR-PER-EM SPACE 
     elif(itmclass & ( 1 << 1 )):
         return "▲ "
     elif(itmclass & ( 1 << 2 )):
-        return "⨯ "
+        return "⨯  "    # U+2004 	THREE-PER-EM SPACE + U+2005 	FOUR-PER-EM SPACE 
     else:
         return "• "
 
