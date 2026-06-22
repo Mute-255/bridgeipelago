@@ -584,18 +584,18 @@ async def on_message(message):
     #     await SendMainChannelMessage(Status)
 
     # Clears registration file for user
-    if message.content.startswith('$clearreg'):
-        Status = await Command_ClearReg(str(message.author))
-        await SendMainChannelMessage(Status)
+    # if message.content.startswith('$clearreg'):
+    #     Status = await Command_ClearReg(str(message.author))
+    #     await SendMainChannelMessage(Status)
 
-    if message.content.startswith('$listreg'):
-        await Command_ListRegistrations(message.author)
+    # if message.content.startswith('$listreg'):
+    #     await Command_ListRegistrations(message.author)
 
     # Opens a discord DM with the user, and fires off the Katchmeup process
     # When the user asks, catch them up on checks they're registered for
     ## Yoinks their registration file, scans through it, then find the related ItemQueue file to scan through 
-    if message.content.startswith('$ketchmeup'):
-        await Command_KetchMeUp(message.author, message.content)
+    # if message.content.startswith('$ketchmeup'):
+    #     await Command_KetchMeUp(message.author, message.content)
     
     # When the user asks, catch them up on the specified game
     ## Yoinks the specified ItemQueue file, scans through it, then sends the contents to the user
@@ -1013,10 +1013,17 @@ async def first_command(interaction: discord.Interaction, slot: str):
     await interaction.response.send_message(content=Status,ephemeral=True)
 
 @tree.command(name="clearreg",
-    description="Clears your registration file"
+    description="Clears your registered slots"
 )
 async def first_command(interaction):
     Status = await Command_ClearReg(str(interaction.user))
+    await interaction.response.send_message(content=Status,ephemeral=True)
+
+@tree.command(name="listreg",
+    description="Lists your registered slots"
+)
+async def listreg_cmd(interaction):
+    Status = await Command_ListRegistrations(str(interaction.user))
     await interaction.response.send_message(content=Status,ephemeral=True)
     
 @tree.command(name="ketchmeup",
@@ -1167,12 +1174,12 @@ async def Command_ListRegistrations(Sender):
 
         RegistrationContents = json.load(open(RegistrationFile, "r"))
         if len(RegistrationContents) == 0:
-            await Sender.send("You are not registered for any slots :(")
+            return "You are not registered for any slots :("
         else:
-            Message = "**You are registered for:**\n"
+            Message = "**You are registered for:** \n"
             for slots in RegistrationContents:
-                Message = Message + slots + "\n"
-            await Sender.send(Message)
+                Message = Message + slots + ", "
+            return (Message[:-2])
     except Exception as e:
         WriteToErrorLog("Command_ListRegistrations", "Error in list registrations command: " + str(e))
         print(e)
