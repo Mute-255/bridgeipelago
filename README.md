@@ -84,10 +84,10 @@ Hopefully that makes sense.
 **All commands are case-sensitive.**
 |Player Commands|Description|
 |---|---|
-|`$register <slot>`|Adds the slot provided to the user's registration file|
-|`$listreg`|Lists all the slots you are registered for|
-|`$clearreg`|Clears the user's registration file|
-|`$ketchmeup <filter>`|DMs the user all checks in their ItemQueue file, used to catch you up on missed checks|
+|`/register <slot>`|Registers for the slot name, or if slot name ends with *, all slots that start with the name (e.g. `Player*`)|
+|`/listreg`|Lists all the slots you are registered for|
+|`/clearreg`|Clears the user's registration file|
+|`/ketchmeup <filter>`|DMs the user all checks in their ItemQueue file, used to catch you up on missed checks|
 ||`2` - Only Logical Progression Items|
 ||`1` - Logical + Useful items|
 ||`0` or empty - Logical + Useful + Normal items + Traps\*|
@@ -96,8 +96,9 @@ Hopefully that makes sense.
 |`$hints`|DMs the hinted items for a player's registered slots|
 |`$hint <slot> \| <item>`|Allows you to request a hint from Archipelago and it'll be relayed to discord|
 |`$deathcount`|Scans the deathlog and tallies up the current deathcount for each slot|
-|`$checkcount`|Fetches the current Arch server's progress in simple txt format|
-|`$checkgraph`|Plots the current Arch progress in a picture|
+|`/checkcount`|Fetches the current Arch server's progress in simple txt format|
+|`/checkgraph`|Plots the current Arch progress in a picture|
+|`/setcol <name> <#hexcol>`|Sets the embed colour for a given prefix name for all embeds related to the name (e.g. if name is `Player`, `/ketchmeup` slots or item feeds that start with `Player` will be that assigned hex code colour, e.g. `#0099FF` or `clear` to remove). This value is set globally regardless of room / UniqueID.
 
 |Admin Commands|Description|
 |---|---|
