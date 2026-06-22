@@ -1005,9 +1005,9 @@ async def ProcessChatQueue():
         await SendDebugChannelMessage("Error In Chat Queue Process")
 
 @tree.command(name="register",
-    description="Registers you for AP slot"
+    description="Registers you for an AP slot"
 )
-@app_commands.describe(slot="Enter name of your slot")
+@app_commands.describe(slot="Enter slot name, or prefix followed by * for all slots starting with prefix (e.g. Player*)")
 async def first_command(interaction: discord.Interaction, slot: str):
     Status = await Command_Register(str(interaction.user), slot)
     await interaction.response.send_message(content=Status,ephemeral=True)
@@ -1059,8 +1059,8 @@ async def first_command(interaction):
 @tree.command(name="sync",
     description="Sync bot commands"
 )
-async def sync_cmd(interaction, guild_id: str = None):
-    sync_count = await (tree.sync() if guild_id is None else tree.sync(guild=discord.Object(id=int(guild_id))))
+async def sync_cmd(interaction):
+    sync_count = await tree.sync()
     await interaction.response.send_message(content=f"Synced {len(sync_count)} commands",ephemeral=True)
 
 @tree.command(name="setcol",
@@ -1105,14 +1105,50 @@ async def Command_Register(Sender:str, ArchSlot:str):
         # Load the registration file
         RegistrationContents = json.load(open(RegistrationFile, "r"))
 
-        # Check the registration file for ArchSlot, if they are not registered; do so. If they already are; tell them.
-        if not ArchSlot in RegistrationContents:
+        wildcard = False
+        found_slot = False
+        register_str = ""
+        if ArchSlot.endswith("*"):
+            ArchSlot = ArchSlot[:-1]
+            wildcard = True
 
-            RegistrationContents.append(ArchSlot)
-            json.dump(RegistrationContents, open(RegistrationFile, "w"), indent=4)
-            return "You've been registered for " + ArchSlot + "!"
+        with open(GetCoreFiles("archconnectiondump"), 'r') as f:
+            _ArchConnectionJSON = json.load(f)
+    
+        for key in _ArchConnectionJSON['slot_info']:
+            slot_name = str(_ArchConnectionJSON['slot_info'][key]['name'])
+            if slot_name.lower().startswith(ArchSlot.lower()):
+                found_slot = True
+                if wildcard:
+                    register_str += slot_name + ", "
+                else:
+                    ArchSlot = slot_name
+                    break
+        
+        if wildcard:
+            if not found_slot:
+                return f"Registration failed - couldn't find any slots in this room starting with `{ArchSlot}`."
+            else:
+                register_str = register_str[:-2]
+            success_str = ""
+            for slot in register_str.split(", "):
+                if not slot in RegistrationContents:
+                    RegistrationContents.append(slot)
+                    success_str += slot + ", "
+            if success_str == "":
+                return f"Registration failed - you're already registered to all slots starting with `{ArchSlot}`."
+            else:
+                json.dump(RegistrationContents, open(RegistrationFile, "w"), indent=4)
+                return "Successfully registered for slot(s): `" + success_str[:-2] + "`!"
         else:
-            return "You're already registered for that slot."
+            if not found_slot:
+                return f"Registration failed - the slot name `{ArchSlot}` does not exist in this room."
+            elif not ArchSlot in RegistrationContents:
+                RegistrationContents.append(ArchSlot)
+                json.dump(RegistrationContents, open(RegistrationFile, "w"), indent=4)
+                return "Successfully registered for slot `" + ArchSlot + "`!"
+            else:
+                return "Registration failed - you're already registered for that slot."
     except Exception as e:
         WriteToErrorLog("Command_Register", "Error in register command: " + str(e))
         print(e)
