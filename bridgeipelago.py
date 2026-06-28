@@ -190,6 +190,8 @@ hintprocessing_queue = Queue()
 string_buffer = ""
 
 user_colour_dict = {}
+game_data_item_lookup_dict = {}
+game_data_loc_lookup_dict = {}
 
 #Discord Bot Initialization
 intents = discord.Intents.default()
@@ -606,8 +608,7 @@ async def on_message(message):
     
     if message.content.startswith('$hints'):
         await Command_Hints(message.author)
-    
-    if message.content.startswith('$hint'):
+    elif message.content.startswith('$hint'):
         hintrequest = [item.strip() for item in ((message.content).split('$hint '))[1].split('|')]
         if(len(hintrequest)==2):
             hint_queue.put(hintrequest)
@@ -1766,9 +1767,27 @@ def ConfirmSpecialFiles():
     if not os.path.exists(GetCoreFiles("coldata")):
         json.dump({}, open(GetCoreFiles("coldata"), "x"))
 
+def UpdateGameDumpMap(f = None):
+    global game_data_item_lookup_dict, game_data_loc_lookup_dict
+    if f is None:
+        f = open(GetCoreFiles("archgamedump"), 'r')
+    _ArchGameJSON = json.load(f)
+    game_data_item_lookup_dict.clear()
+    game_data_loc_lookup_dict.clear()
+    for game in _ArchGameJSON:
+        game_data_item_lookup_dict.update({game: {}})
+        for key in _ArchGameJSON[game]['item_name_to_id']:
+            id = str(_ArchGameJSON[game]['item_name_to_id'][key])
+            game_data_item_lookup_dict[game].update({ id: key })
+        game_data_loc_lookup_dict.update({game: {}})
+        for key in _ArchGameJSON[game]['location_name_to_id']:
+            id = str(_ArchGameJSON[game]['location_name_to_id'][key])
+            game_data_loc_lookup_dict[game].update({ id: key })
+
 def WriteDataPackage(data):
     with open(GetCoreFiles("archgamedump"), 'w') as f:
         json.dump(data['data']['games'], f, indent=4)
+        UpdateGameDumpMap(f)
 
 def WriteArchConnectionJSON(data):
     with open(GetCoreFiles("archconnectiondump"), 'w') as f:
@@ -1825,6 +1844,8 @@ def CheckConnectionDump():
         return False
 
 def LookupItem(game,id):
+    global game_data_item_lookup_dict
+    return game_data_item_lookup_dict.get(game, {}).get(id, "NULL")
     with open(GetCoreFiles("archgamedump"), 'r') as f:
         _ArchGameJSON = json.load(f)
     
@@ -1834,6 +1855,8 @@ def LookupItem(game,id):
     return str("NULL")
     
 def LookupLocation(game,id):
+    global game_data_loc_lookup_dict
+    return game_data_loc_lookup_dict.get(game, {}).get(id, "NULL")
     with open(GetCoreFiles("archgamedump"), 'r') as f:
         _ArchGameJSON = json.load(f)
         
@@ -2106,6 +2129,8 @@ def main():
 
         print("== Arch Data Loaded!")
         time.sleep(2)
+
+    UpdateGameDumpMap()
 
     DiscordThread = Process(target=Discord, args=(CoreConfig,ToggleConfig))
     DiscordThread.start()
