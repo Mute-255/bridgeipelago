@@ -122,8 +122,10 @@ def GetCoreDirectory(folder):
     elif folder == "arch":
         return str(os.getcwd() + CoreConfig["AdvancedConfig"]["ArchipelagoDataDirectory"] + CoreConfig["ArchipelagoConfig"]['UniqueID'] + '/')
     elif folder == "global":
-        return str(os.getcwd() + "/globals/")
-    
+        return str(os.getcwd() + "/Globals/")
+    elif folder == "daily":
+        return str(os.getcwd() + "/DailyCount/" + CoreConfig["ArchipelagoConfig"]['UniqueID'] + '/')
+
 def GetCoreFiles(file):
     global CoreConfig
     global ConfigLock
@@ -566,6 +568,7 @@ async def on_ready():
     ProcessDeathQueue.start()
     ProcessChatQueue.start()
     CheckCommandQueue.start()
+    DailyProgressLog.start()
 
     print("++ ",CoreConfig["AdvancedConfig"]["JoinMessage"])
     print("++ Async bot started -", discord_client.user)
@@ -682,6 +685,9 @@ async def CheckCommandQueue():
         SendCheckQueue.stop()
         ProcessDeathQueue.stop()
         ProcessChatQueue.stop()
+        DailyProgressLog.stop()
+
+        await DailyProgressLog()
         
         print("++ Closing Discord Client")
         exit()
@@ -1004,6 +1010,47 @@ async def ProcessChatQueue():
         WriteToErrorLog("ChatQueue", "Error occurred while processing chat queue: " + str(e))
         print("ChatQueue - Error occurred while processing chat queue: " , str(e))
         await SendDebugChannelMessage("Error In Chat Queue Process")
+
+@tasks.loop(seconds=60)
+async def DailyProgressLog():
+    if CoreConfig["AdvancedConfig"]["SelfHostNoWeb"] == True:
+        return
+    date = datetime.datetime.now(datetime.timezone.utc)
+    date_str = date.strftime("%Y-%m-%d")
+
+    date_file = GetCoreDirectory("daily") + date_str + ".json"
+
+    try:
+        page = requests.get(CoreConfig["ArchipelagoConfig"]['ArchipelagoTrackerURL'])
+        soup = BeautifulSoup(page.content, "html.parser")
+
+        tables = soup.find("table",id="checks-table")
+        for slots in tables.find_all('tbody'):
+            rows = slots.find_all('tr')
+
+        tfoot = tables.find('tfoot')
+
+        total_count = tfoot.find('tr').find_all('td')[3].text.strip() if tfoot else "???"
+        slot_dict = { "total": total_count, "players": {} }
+
+        for row in rows:
+            slot = (row.find_all('td')[1].text).strip()
+            checks = (row.find_all('td')[4].text).strip()
+            slot_dict["players"].update({slot: checks})
+
+        slot_dict["players"] = {key: value for key, value in sorted(slot_dict["players"].items())}
+
+        with open(date_file, "w") as f:
+            json.dump(slot_dict, f, indent=4)
+
+        print(date_str + ": " + str(slot_dict))
+
+    except Exception as e:
+            WriteToErrorLog("DailyProgressLog", "Error in daily progress log: " + str(e))
+            print(e)
+            await DebugChannel.send("ERROR IN DAILYPROGRESSLOG <@"+str(CoreConfig["DiscordConfig"]["DiscordAlertUserID"])+">")
+
+    pass
 
 @tree.command(name="register",
     description="Registers you for an AP slot"
@@ -1766,6 +1813,9 @@ def ConfirmSpecialFiles():
 
     if not os.path.exists(GetCoreFiles("coldata")):
         json.dump({}, open(GetCoreFiles("coldata"), "x"))
+
+    if not os.path.exists(GetCoreDirectory("daily")):
+        os.makedirs(GetCoreDirectory("daily"))
 
 def UpdateGameDumpMap(f = None):
     global game_data_item_lookup_dict, game_data_loc_lookup_dict
