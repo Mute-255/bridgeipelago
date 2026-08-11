@@ -572,6 +572,7 @@ async def on_ready():
 
     print("++ ",CoreConfig["AdvancedConfig"]["JoinMessage"])
     print("++ Async bot started -", discord_client.user)
+    print("++ Discord Broadcast Channel:", MainChannel)
 
 @discord_client.event
 async def on_message(message):
@@ -741,7 +742,7 @@ async def SendCheckQueue():
             description = "```ansi\n" + cur_buffer.strip() + "```",
             color = discord.Color.from_str(col_str)
         )
-        await DebugChannel.send(embed=embed)
+        await MainChannel.send(embed=embed)
     if string_buffer == "":
         # print("stop")
         SendCheckQueue.stop()
@@ -1025,6 +1026,8 @@ async def DailyProgressLog():
         soup = BeautifulSoup(page.content, "html.parser")
 
         tables = soup.find("table",id="checks-table")
+        if tables is None:
+            return
         for slots in tables.find_all('tbody'):
             rows = slots.find_all('tr')
 
