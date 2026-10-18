@@ -31,6 +31,7 @@ import sys
 from enum import Enum
 import logging
 import textwrap
+import glob
 
 #Threading Dependencies
 from threading import Thread, Event
@@ -194,6 +195,8 @@ string_buffer = ""
 user_colour_dict = {}
 game_data_item_lookup_dict = {}
 game_data_loc_lookup_dict = {}
+
+update_daily_log = 3    # Used for daily log check, if no item acquired don't update the daily log file
 
 #Discord Bot Initialization
 intents = discord.Intents.default()
@@ -755,12 +758,14 @@ async def PreSendCheckQueue():
 @tasks.loop(seconds=0.05)
 async def ProcessItemQueue():
     global string_buffer
+    global update_daily_log
     try:
         if item_queue.empty():
             if (not SendCheckQueue.is_running() and SendCheckQueue.seconds != float(OverClockValue)):
                 SendCheckQueue.change_interval(seconds=float(OverClockValue))
             return
         else:
+            update_daily_log = 3
             # print("start: ",len(string_buffer))
             # print(str(datetime.datetime.now()) + " item queue count: " + str(item_queue.qsize()))
             timecode = time.strftime("%Y||%m||%d||%H||%M||%S")
@@ -1014,7 +1019,8 @@ async def ProcessChatQueue():
 
 @tasks.loop(seconds=60)
 async def DailyProgressLog():
-    if CoreConfig["AdvancedConfig"]["SelfHostNoWeb"] == True:
+    global update_daily_log
+    if update_daily_log <= 0 or CoreConfig["AdvancedConfig"]["SelfHostNoWeb"] == True:
         return
     date = datetime.datetime.now(datetime.timezone.utc)
     date_str = date.strftime("%Y-%m-%d")
@@ -1047,6 +1053,8 @@ async def DailyProgressLog():
             json.dump(slot_dict, f, indent=4)
 
         print(date_str + ": " + str(slot_dict))
+
+        update_daily_log -= 1
 
     except Exception as e:
             WriteToErrorLog("DailyProgressLog", "Error in daily progress log: " + str(e))
@@ -1142,6 +1150,27 @@ async def setcol_cmd(interaction, name: str, col: str):
         await interaction.response.send_message(content=f"Set {name} to {col}",ephemeral=True)
     else:
         await interaction.response.send_message(content=f"Provide hex code or `clear`",ephemeral=True)
+
+@tree.command(name="dailylog",
+    description="Displays graph of overall checks based on daily progress or optionally a single slot/day's progress"
+)
+@app_commands.describe(
+    filter="(Optional) Enter single slot name or single date (YYYY-MM-DD)",
+    
+)
+async def dailylog_cmd(interaction, filter: str = None):
+    for filename in glob.glob(GetCoreDirectory("daily") + "*.json"):
+        with open(filename, "r") as f:
+            data = json.load(f)
+            if filter is not None:
+                if filter in data["players"]:
+                    print(f"{filename}: {filter} has {data['players'][filter]} checks")
+                elif filter in filename:
+                    print(f"{filename}: Total checks: {data['total']}")
+            else:
+                print(f"{filename}: Total checks: {data['total']}")
+    await interaction.response.send_message(content="Daily progress log generated",ephemeral=True)
+    pass
 
 async def SendMainChannelMessage(message):
     await MainChannel.send(message)
