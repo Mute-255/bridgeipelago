@@ -225,7 +225,7 @@ class TrackerClient():
     global CoreConfig
     global ConfigLock
     tags: set[str] = {'TextOnly','Tracker', 'DeathLink'}
-    version: dict[str, any] = {"major": 0, "minor": 6, "build": 0, "class": "Version"}
+    version: dict[str, any] = {"major": 0, "minor": 6, "build": 8, "class": "Version"}
     items_handling: int = 0b000  # This client does not receive any items
 
     class MessageCommand(Enum):
@@ -369,8 +369,10 @@ class TrackerClient():
 
     def get_datapackage(self) -> None:
         print("-- Requesting DataPackage from server.")
+        RequestedGames = json.load(open(GetCoreFiles("archroomdata"), 'r'))["games"]
         payload = {
-            'cmd': 'GetDataPackage'
+            'cmd': 'GetDataPackage',
+            'games': RequestedGames
         }
         self.send_message(payload)
 
